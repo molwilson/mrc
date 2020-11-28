@@ -1,28 +1,12 @@
 ---
-title: "Assessment data - processing"
+title: "MRC Reef Assessment"
 author: "Molly Wilson"
-date: "11/12/2020"
-output: html_document
+date: "11/27/2020"
+output: 
+  html_document:
+    code_folding: hide
 ---
 # {.tabset}
-
-Notes for updates:
-
-- Group all stony corals into one category (LC, SLC) - pie chart with percentages + standard errors
-- Coral species: group partially dead into healthy, arrange by abundance
-- Macroalgae: calcified vs. palatable by site
-- Take out height graph
-- Turf algae - levels of sediment high/med/low (as opposed to turf categories)
-- Fish - just do total biomass and herbivore biomass compared to regional averages
-- Maybe just herbivores by species?
-- Total species in appendix 
-- For terminal phase - by species, top 3, with mean of terminal phase in other systems (bonaire?)
-- Something to show density by size - high abundance of juvenile fish, (maybe just add juvenile to above graph....?)
-- Diadema - one graph for adults and juveniles, show that its patchy
-
-- Change to Friars Head
-- Change to York Island
-
 
 ```{r, message = F, warning = F, echo = F}
 # setup
@@ -32,8 +16,9 @@ library(here) # for accessing files with directory
 library(readxl) # for reading indv. sheets within excel files
 library(janitor) # for cleaning variable names so they have consistent capitalization etc.
 library(snakecase) # for adjusting capitalization of text within data (e.g., species names)
+library(knitr) # for including tables
 
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE) # this sets the preferences for each code chunk so that errors/messages/warnings don't get displayed in the knit rmarkdown
+knitr::opts_chunk$set(message = FALSE, warning = FALSE) # this sets the preferences for each code chunk so that errors/messages/warnings don't get displayed in the knit rmarkdown
 ```
 
 ```{r}
@@ -56,6 +41,7 @@ benthic <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "benthic") %>
   select(-c(date, surveyor, notes)) %>%
   separate(species_code, c("species_code", "indicator")) %>% # separating variables with an underscore into two columns
   mutate(species = to_any_case(species, case = "sentence"), # this makes sure species names are correctly capitalized
+         site = to_any_case(site, case = "title"),
          benthic_class = case_when(category_code %in% c("LC", "SLC") ~ "Hard corals",
                                   category_code %in% c("MA") ~ "Macroalgae",
                                   category_code %in% c("TA") ~ "Turf algae",
@@ -63,6 +49,9 @@ benthic <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "benthic") %>
                                   category_code %in% c("OINV", "SPON", "AINV", "CYAN") ~ "Other competitors",
                                   category_code %in% c("SAND", "HOLE", "SG", "PAVE") ~ "Other substratum"
                                     ),
+         algal_type = case_when(type_code %in% c("BFMA", "GFMA", "RFMA") ~ "Fleshy macroalgae",
+                                type_code %in% c("GCMA", "RCMA") ~ "Calcareous macroalgae",
+                                type_code %in% c("TA", "TAS", "STA") ~ "Turf algae"),
          av_sub_yn = if_else(category_code %in% c("SAND", "HOLE", "SG", "PAVE"), "no", "yes")
          )  %>%
   filter(!(site == "Rickett's Bay" & ((transect == 1 & meter == 9) | (transect == 2 & meter == 9)))) # both of these meters were only sand and/or seagrass, and were causing issues later in the analysis
@@ -72,30 +61,16 @@ macroinverts <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "macroin
   select(-c(date, surveyor))
 ```
 
-Notes for Gen's data - 
-- Jania should be capitalized (done)
-- switch unknown macroalgaes to e.g. RFMA_UK
-- switch ND CCA to CCA_ND, TA FB to TA_FB, etc. (done)
-- PDC_WP - does this still apply or this would now be considered SLC?
-- making sure species names are lowercase (done in R)
-- split urchins and recruits into separate sheets (done)
-
 ## Benthic
 
-Processing notes:
+Notes on adjustments to OG benthic dataset:
 
-- First creating dataframes that calculate percent cover based on benthic class (for broad summary categories), type (for macro and turf algae analyses), and species (for coral analyses)
-- Looking at prevalence of stressed corals by species
-- Looking at macroalgal canopy height
-
-Target plots:
-
-- broad categories by site (on a map?)
-- corals: abundance of different species/genus/shape 
-- stressed vs. unstressed corals by species/genus 
-- across algae - turfs/macroalgae (one with only MA) by type, what is palatable and to what
-- sedimentation - TA by type - by site
-- (average dictyota height by site)
+ - Consistency in use of spaces/dashes/underscores - currently species codes have identifier first, then underscore to indicator/additional data (e.g. switch ND CCA to CCA_ND, TA FB to TA_FB, etc.) (done)
+      - Eventually switch unknown MA to something like RFMA_UK or RFMA_SPP, and switch other algal species to codes (e.g. Dictyota) for easier entry. Doesn't matter for this version
+ - Some extra lookups can be removed, e.g. PDC - WP
+ - Jania should be capitalized (done)
+ - Making sure species names are capitalized properly (done in R code)
+ - Split urchins and recruits into separate sheets (done)
 
 ```{r}
 # calculating percent cover by benthic class and site
@@ -163,8 +138,8 @@ benthic.pc.type <- benthic.pc.type.m %>%
   summarize(pc.t = mean(pc.m)) %>%
   ungroup() %>%
   group_by(site, type, type_code) %>%
-  summarize(pc = mean(pc.t)
-            #se = sd(pc.t)/sqrt(n.tran)
+  summarize(pc = mean(pc.t),
+            se = sd(pc.t)/sqrt(n())
             ) %>%
   ungroup() %>%
   left_join(benthic %>%
@@ -180,12 +155,11 @@ test.site <- benthic.pc.type %>%
   group_by(site) %>%
   summarize(total = sum(pc))
 ```
-
 ``` {r}
 # calculating percent cover by species and site
 
 benthic.pc.spp.m <- benthic %>%
-  expand(nesting(site, transect, meter), species_code, ) %>%
+  expand(nesting(site, transect, meter), species_code) %>%
   left_join(benthic %>% 
               filter(av_sub_yn == "yes") %>% 
               group_by(site, transect, meter) %>%
@@ -204,13 +178,12 @@ benthic.pc.spp <- benthic.pc.spp.m %>%
   summarize(pc.t = mean(pc.m)) %>%
   ungroup() %>%
   group_by(site, species_code) %>%
-  summarize(pc = mean(pc.t)
-            #se = sd(pc.t)/sqrt(n.tran)
+  summarize(pc = mean(pc.t),
+            se = sd(pc.t)/sqrt(n())
             ) %>%
   ungroup() %>%
   left_join(benthic %>%
               select(species_code, benthic_class) %>%
-              # filter(benthic_class != "Stressed hard corals") %>% # otherwise each coral species row gets duplicated
               distinct(),
             by = "species_code") %>%
   filter(benthic_class != "Other substratum")
@@ -223,49 +196,73 @@ test.site <- benthic.pc.spp %>%
   summarize(total = sum(pc))
 ```
 
-### Summary plot by benthic class
+### Site-level summary
+
+Notes:
+
+ - All scleractinian corals (LC, SLC) are grouped here as hard corals
+ - All AINV, OINV, SPON, and CYAN are grouped as other competitors
+ - These values are percent cover of available substrate (i.e. does not include seagrass, sand, holes, and pavement - wasn't sure what to do with pavement or what that exactly is)
+ - Rickett's Bay apostrophe comes out in actual graph file, not on this knit html for some reason
 
 ``` {r}
-class.palette <- c("coral", "pink", "darkolivegreen", "darkkhaki", "slategray3")
+class.palette <- c("coral2", "pink", "darkolivegreen", "darkkhaki", "slategray3")
 
-ggplot(benthic.pc.class %>%
-         mutate(pc = round(pc, 1),
-                ypos = cumsum(pc)- 0.5*pc), 
+ggplot(benthic.pc.class, 
        aes(x = "benthic_class", y = pc, fill = benthic_class)) + 
   geom_bar(width = 1, stat = "identity", color = "black") +
   coord_polar("y", start=0) +
   scale_fill_manual(values = class.palette) +
   facet_wrap(vars(site), nrow = 2) +
-  geom_text(aes(y = ypos, label = pc), color = "white", size=2) +
+  #geom_text(aes(y = ypos, label = pc), color = "white", size=2) +
   theme_void() +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        panel.spacing = unit(1, "lines"))
 ```
 
 
-### Hard corals 
+Values for percent cover and standard error by benthic class
 
-#### Percent cover by species and site
+```{r}
+kable(benthic.pc.class %>% select(site, benthic_class, pc, se))
+```
 
-*Note: eventually color code these by shape?*
+
+### Hard corals
+
+Notes: 
+
+  - It gets complicated to include disease instances in here because of the error bars. It could be better just to note that the only disease observed on transects was on OFAV in Ten Pound Bay...?
+  - If you would prefer to arrange these by genus and not by abundance that is easy!
+  
 ```{r}
 corals <- benthic.pc.spp %>%
   filter(benthic_class %in% c("Hard corals")) %>%
   select(-benthic_class) %>%
+  group_by(species_code) %>%
+  summarize(pc.tot = mean(pc),
+            se = sd(pc)/sqrt(n())) %>%
   left_join(benthic %>%
               filter(category_code %in% c("LC", "SLC")) %>%
               select(species_code, species, genus = type) %>%
               distinct())
 
-ggplot(corals, aes(x = species, y = pc, fill = genus)) +
-  geom_col() +
-  facet_wrap(vars(site), nrow = 2) +
+ggplot(corals, aes(x = reorder(species, pc.tot), y = pc.tot)) +
+  geom_col(color = "black", fill = "coral2", alpha = 0.8, stat = "identity",
+           position = position_dodge()) +
+  geom_errorbar(aes(ymin = pc.tot - se, ymax = pc.tot + se), width = .2,
+                 position = position_dodge(.9)) +
   coord_flip() +
-  labs(x = "", y = "Mean percent cover") +
-  theme_bw()
+  labs(x = "Coral species", y = "Mean percent cover") +
+  theme_bw() +
+  theme(axis.text.y = element_text(face = "italic"))
 ```
-#### Coral stress by species and site
 
-```{r}
+
+```{r, eval = F}
+# Coral stress by species and site
+
 coral.stress.spp <- benthic %>%
   filter(benthic_class %in% c("Live hard corals", "Stressed hard corals")) %>%
   mutate(health = case_when(is.na(indicator) ~ "Healthy",
@@ -307,86 +304,163 @@ ggplot(coral.stress.site, aes(x = site, y = n, fill = health)) +
   scale_fill_manual(values = c("gray30", "cadetblue", "gray90"), name = "Health") +
   labs(x = "Site", y = "Number of points observed") +
   theme_bw()
-  
 ```
 
-### Macroalgae
+### Algae
 
-#### Percent cover by type/palatability and site
+Notes:
+
+  - Not sure if we wanted to include turf and macroalgae here, but could be good to look at in terms of overall palatability...?
+  - Might be better to take out the colors and just add the x axis text back in...?
+  
 ```{r}
-macro <- benthic.pc.type %>%
-  filter(benthic_class == "Macroalgae") %>%
-  mutate(palatability = if_else(type_code %in% c("BFMA", "GFMA", "RFMA"), "palatable", "unpalatable"),
-         type = word(type, 1, 2))
+algae.pc.type.m <- benthic %>%
+  expand(nesting(site, transect, meter), algal_type) %>%
+  left_join(benthic %>% 
+              filter(av_sub_yn == "yes") %>% 
+              group_by(site, transect, meter) %>%
+              mutate(n_pts = n()) %>% 
+              ungroup() %>%
+              group_by(site, transect, meter, n_pts, algal_type) %>%
+              summarize(pc.m = 100*n()/n_pts) %>%
+              ungroup() %>%
+              distinct() %>%
+              select(-n_pts), 
+            by = c("site", "transect", "meter", "algal_type")) %>%
+  mutate(pc.m = if_else(is.na(pc.m), 0, pc.m))
 
-ggplot(macro, aes(x = type, y = pc, fill = palatability)) +
-  geom_col() +
-  facet_grid(. ~ site) +
-  labs(x = "Macroalgal type", y = "Mean percent cover") +
+algae.pc.type <- algae.pc.type.m %>%
+  group_by(site, transect, algal_type) %>%
+  summarize(pc.t = mean(pc.m)) %>%
+  ungroup() %>%
+  group_by(site, algal_type) %>%
+  summarize(pc = mean(pc.t),
+            se = sd(pc.t)/sqrt(n())
+            ) %>%
+  ungroup()
+
+test.m <- algae.pc.type.m %>%
+  group_by(site, transect, meter) %>%
+  summarize(total = sum(pc.m))
+test.site <- algae.pc.type %>%
+  group_by(site) %>%
+  summarize(total = sum(pc))
+
+algal.palette <- c("darkseagreen", "darkolivegreen", "darkkhaki")
+ggplot(algae.pc.type %>%
+         filter(!is.na(algal_type)), 
+       aes(x = algal_type, y = pc, fill = algal_type)) +
+  geom_col(stat = "identity", color = "black", alpha = 0.8,
+           position = position_dodge()) +
+  geom_errorbar(aes(ymin = pc - se, ymax = pc + se), width = .2,
+                 position = position_dodge(.9)) +
+  scale_fill_manual(values = algal.palette) +
+  facet_wrap(vars(site), nrow = 2) +
+  labs(x = "Algal type", y = "Mean percent cover") +
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, h = 1))
+  theme(axis.text.x = element_blank(),
+        legend.position = "bottom", 
+        legend.title = element_blank())
 ```
-#### Macroalgal heights by site (and type?)
 
-*Should this be only dictyota?*?
-```{r}
-macro.height <- benthic %>%
-  filter(benthic_class == "Macroalgae") %>%
-  group_by(site, transect, meter, type, type_code) %>%
-  summarize(height.mm.m = mean(height, na.rm = T)) %>%
-  group_by(site, transect, type, type_code) %>%
-  summarize(height.mm.t = mean(height.mm.m, na.rm = T)) %>%
-  group_by(site, type, type_code) %>%
-  summarize(height.mm = mean(height.mm.t, na.rm = T)) %>%
-  mutate(palatability = if_else(type_code %in% c("BFMA", "GFMA", "RFMA"), "palatable", "unpalatable"),
-         type = word(type, 1, 2))
+###  Sedimentation
 
-ggplot(macro.height, aes(x = type, y = height.mm, fill = palatability)) +
-  geom_col() +
-  facet_grid(. ~ site) +
-  labs(x = "Macroalgal type", y = "Mean canopy height (mm)") +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, h = 1))
-  
-  
-```
+Notes: 
 
-####  Turf algae + sediments
+  - These are calculated as the percent of all turf points that are TA/TAS/STA, and do not reflect the percent cover of all turf algal types within a site
 
 ```{r}
-turf <- benthic.pc.type %>%
-  filter(benthic_class == "Turf algae") %>%
-  mutate(palatability = case_when(type_code == "TA" ~ "palatable",
-                                  type_code == "TAS" ~ "semi-palatable",
-                                  type_code == "STA" ~ "unpalatable"))
-  
-ggplot(turf, aes(x = type, y = pc, fill = palatability)) +
-  geom_col() +
-  facet_grid(. ~ site) +
-  labs(x = "Macroalgal type", y = "Mean percent cover") +
+sediment.m <- benthic %>%
+  filter(category_code == "TA") %>%
+  expand(nesting(site, transect, meter), type_code) %>%
+  left_join(benthic %>% 
+              filter(category_code == "TA") %>%
+              group_by(site, transect, meter) %>%
+              mutate(n_pts = n()) %>% 
+              ungroup() %>%
+              group_by(site, transect, meter, n_pts, type_code) %>%
+              summarize(pc.m = 100*n()/n_pts) %>%
+              ungroup() %>%
+              distinct() %>%
+              select(-n_pts), 
+            by = c("site", "transect", "meter", "type_code")) %>%
+  mutate(pc.m = if_else(is.na(pc.m), 0, pc.m))
+
+sediment <- sediment.m %>%
+  group_by(site, transect, type_code) %>%
+  summarize(pc.t = mean(pc.m)) %>%
+  ungroup() %>%
+  group_by(site, type_code) %>%
+  summarize(pc = mean(pc.t),
+            se = sd(pc.t)/sqrt(n())
+            ) %>%
+  ungroup() %>%
+  mutate(sedimentation = case_when(type_code == "TA" ~ "Low",
+                                  type_code == "TAS" ~ "Medium",
+                                  type_code == "STA" ~ "High")) %>%
+  mutate(sedimentation = factor(sedimentation, levels = c("Low", "Medium", "High")))
+
+ggplot(sediment, aes(x = sedimentation, y = pc)) +
+  geom_col(stat = "identity", color = "black", fill = "bisque3", alpha = 0.8,
+           position = position_dodge()) +
+  geom_errorbar(aes(ymin = pc - se, ymax = pc + se), width = .2,
+                 position = position_dodge(.9)) +
+  #scale_fill_manual(values = sediment.palette) +
+  facet_wrap(vars(site), nrow = 2) +
+  labs(x = "Sedimentation level", y = "Mean percent cover") +
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, h = 1))
+  theme(#axis.text.x = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_blank())
 ```
 
 ## Fish
 
-Processing notes:
-- First creating expanded dataframes by species, family, and functional group to calculate average biomass
-- Could eventually look at densities and/or average length
+Notes...
 
-Target plots:
+  - Add graph of total herbivores by site, by family?
+  - Add graph of size distribution of S. viride, S. vetula, S. iserti
+  - Add graph of average biomass by species (across all sites) for appendix
 
-Fish:
-  - Biomass of functional groups per site, maybe total biomass/herbivore biomass () regional average pristine
-  - Size of terminal phases compared to regional average 
+### Total biomass by site
 
-### Biomass by site by species, family, and functional group
+Notes:
+
+  - Regional averages are taken from Karr et al. 2015
 
 ```{r}
+fish.bm <- fish %>%
+  filter(biomass > 0) %>% 
+  group_by(site, transect) %>%
+  summarize(bm.t = sum(biomass/1000/120*10000)) %>% # kg/ha
+  group_by(site) %>%
+  summarize(bm = mean(bm.t),
+            se = sd(bm.t)/sqrt(n()))
+
+ggplot(fish.bm, aes(x = site, y = bm)) +
+  geom_col(color = "black", fill = "slategray4", alpha = 0.8, stat = "identity", position = position_dodge()) +
+  geom_errorbar(aes(ymin = bm - se, ymax = bm + se), width = .2,
+                 position = position_dodge(.9)) +
+  geom_hline(yintercept = 1300, linetype = "dashed", color = "black") +
+  annotate("text", x = 6.5, y = 1350, size = 3, hjust = 1, label=c('Average unfished biomass for the Caribbean')) +
+  labs(x = "", y = "Total fish biomass (kg/ha)") +
+  theme_bw()
+```
+
+### Herbivore biomass by site
+
+Notes:
+
+  - I can't really find regional averages for herbivores or scarids/acanthurids.... I could include a reference line for Bonaire as an unfished comparison? But I'm not sure if that is just super random?
+
+
+### Species biomass across sites
+
+```{r, fig.height = 8, fig.width = 8}
 fish.bm.spp.t.raw <- fish %>%
-  filter(biomass > 0) %>% # only looking at what is considered available substrate (no sand, seagrass, etc.)
+  filter(biomass > 0) %>%
   group_by(site, transect, species_code) %>%
-  summarize(bm.spp.t = sum(biomass/1000)/1.2) # biomass per 100 m2
+  summarize(bm.spp.t = sum(biomass/120)) # g/m2
 
 fish.bm.spp.t <- fish %>%
   expand(site, transect, species_code) %>%
@@ -402,6 +476,28 @@ fish.bm.spp.site <- fish.bm.spp.t %>%
   summarize(n.t = n(),
             bm = mean(bm.spp.t),
             se = sd(bm.spp.t)/sqrt(n.t))
+
+fish.bm.spp <- fish.bm.spp.site %>%
+  group_by(species_code, species_name, common_name, family, functional_group) %>%
+  summarize(bm.tot = mean(bm),
+            se = sd(bm)/sqrt(n()))
+
+ggplot(fish.bm.spp,
+       aes(x = reorder(species_name, bm.tot), y = bm.tot)) +
+  geom_col(color = "black", fill = "cadetblue2", alpha = 0.8, stat = "identity", position = position_dodge()) +
+  geom_errorbar(aes(ymin = bm.tot - se, ymax = bm.tot + se), width = .2,
+                 position = position_dodge(.9)) +
+  coord_flip() +
+  labs(y = "Biomass (g/m2)", x = "") + 
+  theme_bw() +
+  theme(axis.text.y = element_text(face = "italic"),
+        legend.position = "right",
+        legend.title = element_blank())
+```
+
+
+```{r, eval = F}
+
 
 fish.bm.fam.site <- fish.bm.spp.t %>%
   group_by(site, family, transect) %>%
@@ -435,50 +531,74 @@ ggplot(fish.bm.spp.site, aes(x = species_name, y = bm, group = family, fill = fa
   theme(axis.text.x = element_text(angle = 90))
   
 ```
+
 ### Length distribution of terminal phase scarids
-```{r}
+
+Notes:
+
+  - Need to decide what my reference points are here - mean terminal phase sizes in Bonaire, or other unfished populations? Will look through literature more...
+  - could also look at sex ratio as better indicator? (and compare with that Bermuda paper...
+  
+```{r, eval = F}
 scarids <- fish %>%
-  filter(family == "Scaridae" & phase_code %in% c("i", "t")) 
+  filter(species_code %in% c("stop", "rbp", "strp") & phase_code %in% c("i", "t")) 
 
 ggplot(scarids, aes(x = length, group = phase, fill = phase)) +
   geom_density(alpha = 0.5) +
   labs(x = "Scarid length (cm)", y = "Density") +
+  facet_grid(. ~ species_name) +
   theme_bw()
 ```
 
 ## Diadema 
 
-*Note: can convert to different unit - currently per 20m2*
+Notes:
+
+  - Estimated pre-mortality estimates for Antigua are obtained from Jackson et al. 2014, Bauer 1980 ~ 5 indv./m$^2$
 ```{r}
 diadema <- macroinverts %>%
-  select(site, transect, mature = diadema_adults, juvenile = diadema_juvenile) %>%
-  pivot_longer(-c(site, transect), names_to = "age", values_to = "count") %>%
-  group_by(site, age) %>%
-  summarize(density.20 = mean(count),
+  mutate(count = (diadema_adults + diadema_juvenile)/10) %>% # converting to #/m2 (from #/10m2)
+  select(site, transect, count) %>%
+  group_by(site) %>%
+  summarize(density = mean(count),
             se = sd(count)/sqrt(n()))
 
-ggplot(diadema, aes(x = site, y = density.20)) +
-  geom_col() +
-  facet_grid(. ~ age) +
+ggplot(diadema, aes(x = site, y = density)) +
+  geom_col(stat = "identity", color = "black", fill = "gray20", alpha = 0.8,
+           position = position_dodge()) +
+  geom_errorbar(aes(ymin = density - se, ymax = density + se), width = .2,
+                 position = position_dodge(.9)) +
+  geom_hline(yintercept = 5, linetype = "dashed", color = "black") +
+  annotate("text", x = 6.5, y = 5.2, size = 3, hjust = 1, label=c('Estimated pre-mortality densities in Antigua')) +
+  #geom_text(aes(0, 5, label = "test", vjust = -1), size = 3) +
   theme_bw() +
-  labs(y = "Diadema density (indv/10m2)") +
-  theme(axis.text.x = element_text(angle = 90))
-        
+  labs(y = "Diadema density (indv. m-2)", x = "") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ## Rugosity
 
+Notes:
+
+   - From Alvarez-Filip et al. 2009: Lesser Antilles average was 2.1 in the 1970s, 1.5 in 2000s
+   
 ```{r}
 rugosity <- rugosity %>%
   group_by(site, transect) %>%
   summarize(rugosity.t = mean(rugosity/100)) %>%
   group_by(site) %>%
-  summarize(rugosity = mean(rugosity.t))
+  summarize(rugosity = mean(rugosity.t),
+            se = sd(rugosity.t)/sqrt(n()))
 
 ggplot(rugosity, aes(x = site, y = rugosity)) +
-  geom_col() +
+  geom_col(stat = "identity", color = "black", fill = "gray20", alpha = 0.8,
+           position = position_dodge()) +
+  geom_errorbar(aes(ymin = rugosity - se, ymax = rugosity + se), width = .2,
+                 position = position_dodge(.9)) +
+  geom_hline(yintercept = 2.1, linetype = "dashed", color = "black") +
+  annotate("text", x = 6.5, y = 2.2, size = 3, hjust = 1, label=c('Lesser Antilles mean from 1970s')) +
   theme_bw() +
-  labs(y = "Rugosity") +
-  theme(axis.text.x = element_text(angle = 90))
+  labs(y = "Rugosity ratio", x = "") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
