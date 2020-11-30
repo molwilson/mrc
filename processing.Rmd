@@ -1,7 +1,7 @@
 ---
 title: "MRC Reef Assessment"
 author: "Molly Wilson"
-date: "11/27/2020"
+date: "11/29/2020"
 output: 
   html_document:
     code_folding: hide
@@ -21,20 +21,19 @@ library(knitr) # for including tables
 knitr::opts_chunk$set(message = FALSE, warning = FALSE) # this sets the preferences for each code chunk so that errors/messages/warnings don't get displayed in the knit rmarkdown
 ```
 
+## Benthic
+
+Notes on adjustments to OG benthic dataset:
+
+ - Consistency in use of spaces/dashes/underscores - currently species codes have identifier first, then underscore to indicator/additional data (e.g. switch ND CCA to CCA_ND, TA FB to TA_FB, etc.) (done)
+      - Eventually switch unknown MA to something like RFMA_UK or RFMA_SPP, and switch other algal species to codes (e.g. Dictyota) for easier entry. Doesn't matter for this version
+ - Some extra lookups can be removed, e.g. PDC - WP
+ - Jania should be capitalized (done)
+ - Making sure species names are capitalized properly (done in R code)
+ - Split urchins and recruits into separate sheets (done)
+
 ```{r}
-# import data
-
-fish <- read_excel(here("data", "MRC_fish.xlsx"), sheet = "mrc.fish") %>% clean_names() %>%
-  select(-c(date, time, depth_m, surveyor)) %>% # not using these variables currently, so nice to streamline
-  filter(!is.na(site)) %>% # remove any incomplete rows at the end of the data
-  uncount(number) %>% # expand to replicate rows if multiple fish were recorded
-  mutate(phase_code = tolower(phase),
-         phase = case_when(phase == "j" ~ "juvenile",
-                           phase == "i" ~ "initial",
-                           phase == "t" ~ "terminal"))
-
-rugosity <- read_excel(here("data", "MRC_data.xlsx"), sheet = "mrc.rugosity") %>% clean_names() %>%
-   select(-c(date, time, depth_m, surveyor))
+# import and processing
 
 benthic <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "benthic") %>% clean_names() %>%
   filter(!is.na(site)) %>%
@@ -55,25 +54,6 @@ benthic <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "benthic") %>
          av_sub_yn = if_else(category_code %in% c("SAND", "HOLE", "SG", "PAVE"), "no", "yes")
          )  %>%
   filter(!(site == "Rickett's Bay" & ((transect == 1 & meter == 9) | (transect == 2 & meter == 9)))) # both of these meters were only sand and/or seagrass, and were causing issues later in the analysis
-
-macroinverts <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "macroinvertebrates") %>% clean_names() %>%
-  filter(!is.na(site)) %>%
-  select(-c(date, surveyor))
-```
-
-## Benthic
-
-Notes on adjustments to OG benthic dataset:
-
- - Consistency in use of spaces/dashes/underscores - currently species codes have identifier first, then underscore to indicator/additional data (e.g. switch ND CCA to CCA_ND, TA FB to TA_FB, etc.) (done)
-      - Eventually switch unknown MA to something like RFMA_UK or RFMA_SPP, and switch other algal species to codes (e.g. Dictyota) for easier entry. Doesn't matter for this version
- - Some extra lookups can be removed, e.g. PDC - WP
- - Jania should be capitalized (done)
- - Making sure species names are capitalized properly (done in R code)
- - Split urchins and recruits into separate sheets (done)
-
-```{r}
-# calculating percent cover by benthic class and site
 
 # "expand" a dataframe so that it contains all benthic classes per site/transect/meter, and then join the full dataset so that any meters where a species was absent it will show up as 0 (as opposed to just not having an entry at all)
 benthic.pc.class.m <- benthic %>%
@@ -113,9 +93,7 @@ test.m <- benthic.pc.class.m %>%
 test.site <- benthic.pc.class %>%
   group_by(site) %>%
   summarize(total = sum(pc))
-```
 
-``` {r}
 # calculating percent cover by type and site
 
 benthic.pc.type.m <- benthic %>%
@@ -154,8 +132,7 @@ test.m <- benthic.pc.type.m %>%
 test.site <- benthic.pc.type %>%
   group_by(site) %>%
   summarize(total = sum(pc))
-```
-``` {r}
+
 # calculating percent cover by species and site
 
 benthic.pc.spp.m <- benthic %>%
@@ -208,7 +185,8 @@ Notes:
 ``` {r}
 class.palette <- c("coral2", "pink", "darkolivegreen", "darkkhaki", "slategray3")
 
-ggplot(benthic.pc.class, 
+ggplot(benthic.pc.class %>%
+         mutate(site = factor(site, levels = c("Rickett s Bay", "Ten Pound Bay", "The Barge", "York Bank", "York Island", "Friars Head Bay"))), 
        aes(x = "benthic_class", y = pc, fill = benthic_class)) + 
   geom_bar(width = 1, stat = "identity", color = "black") +
   coord_polar("y", start=0) +
@@ -222,7 +200,7 @@ ggplot(benthic.pc.class,
 ```
 
 
-Values for percent cover and standard error by benthic class
+**Values for percent cover and standard error by benthic class:**
 
 ```{r}
 kable(benthic.pc.class %>% select(site, benthic_class, pc, se))
@@ -254,7 +232,7 @@ ggplot(corals, aes(x = reorder(species, pc.tot), y = pc.tot)) +
   geom_errorbar(aes(ymin = pc.tot - se, ymax = pc.tot + se), width = .2,
                  position = position_dodge(.9)) +
   coord_flip() +
-  labs(x = "Coral species", y = "Mean percent cover") +
+  labs(x = "", y = "Mean percent cover") +
   theme_bw() +
   theme(axis.text.y = element_text(face = "italic"))
 ```
@@ -348,7 +326,8 @@ test.site <- algae.pc.type %>%
 
 algal.palette <- c("darkseagreen", "darkolivegreen", "darkkhaki")
 ggplot(algae.pc.type %>%
-         filter(!is.na(algal_type)), 
+         filter(!is.na(algal_type)) %>%
+         mutate(site = factor(site, levels = c("Rickett s Bay", "Ten Pound Bay", "The Barge", "York Bank", "York Island", "Friars Head Bay"))), 
        aes(x = algal_type, y = pc, fill = algal_type)) +
   geom_col(stat = "identity", color = "black", alpha = 0.8,
            position = position_dodge()) +
@@ -407,7 +386,7 @@ ggplot(sediment, aes(x = sedimentation, y = pc)) +
                  position = position_dodge(.9)) +
   #scale_fill_manual(values = sediment.palette) +
   facet_wrap(vars(site), nrow = 2) +
-  labs(x = "Sedimentation level", y = "Mean percent cover") +
+  labs(x = "Sedimentation level", y = "Percent of turf algae") +
   theme_bw() +
   theme(#axis.text.x = element_blank(),
         legend.position = "bottom",
@@ -416,20 +395,20 @@ ggplot(sediment, aes(x = sedimentation, y = pc)) +
 
 ## Fish
 
-Notes...
-
-  - Add graph of total herbivores by site, by family?
-  - Add graph of size distribution of S. viride, S. vetula, S. iserti
-  - Add graph of average biomass by species (across all sites) for appendix
-
-### Total biomass by site
-
-Notes:
-
-  - Regional averages are taken from Karr et al. 2015
-
 ```{r}
-fish.bm <- fish %>%
+# import and processing
+
+fish <- read_excel(here("data", "MRC_fish.xlsx"), sheet = "mrc.fish") %>% clean_names() %>%
+  select(-c(date, time, depth_m, surveyor)) %>% # not using these variables currently, so nice to streamline
+  filter(!is.na(site)) %>% # remove any incomplete rows at the end of the data
+  uncount(number) %>% # expand to replicate rows if multiple fish were recorded
+  mutate(phase_code = tolower(phase),
+         phase = case_when(phase == "j" ~ "Juvenile",
+                           phase == "i" ~ "Initial",
+                           phase == "t" ~ "Terminal"))
+
+# total biomass by site
+fish.bm.site <- fish %>%
   filter(biomass > 0) %>% 
   group_by(site, transect) %>%
   summarize(bm.t = sum(biomass/1000/120*10000)) %>% # kg/ha
@@ -437,30 +416,11 @@ fish.bm <- fish %>%
   summarize(bm = mean(bm.t),
             se = sd(bm.t)/sqrt(n()))
 
-ggplot(fish.bm, aes(x = site, y = bm)) +
-  geom_col(color = "black", fill = "slategray4", alpha = 0.8, stat = "identity", position = position_dodge()) +
-  geom_errorbar(aes(ymin = bm - se, ymax = bm + se), width = .2,
-                 position = position_dodge(.9)) +
-  geom_hline(yintercept = 1300, linetype = "dashed", color = "black") +
-  annotate("text", x = 6.5, y = 1350, size = 3, hjust = 1, label=c('Average unfished biomass for the Caribbean')) +
-  labs(x = "", y = "Total fish biomass (kg/ha)") +
-  theme_bw()
-```
-
-### Herbivore biomass by site
-
-Notes:
-
-  - I can't really find regional averages for herbivores or scarids/acanthurids.... I could include a reference line for Bonaire as an unfished comparison? But I'm not sure if that is just super random?
-
-
-### Species biomass across sites
-
-```{r, fig.height = 8, fig.width = 8}
+# species biomass by transect
 fish.bm.spp.t.raw <- fish %>%
   filter(biomass > 0) %>%
   group_by(site, transect, species_code) %>%
-  summarize(bm.spp.t = sum(biomass/120)) # g/m2
+  summarize(bm.spp.t = sum(biomass/1000/120*10000)) # kg/ha
 
 fish.bm.spp.t <- fish %>%
   expand(site, transect, species_code) %>%
@@ -471,44 +431,21 @@ fish.bm.spp.t <- fish %>%
               unique(),
                       by = "species_code")
 
+# species biomass by site
 fish.bm.spp.site <- fish.bm.spp.t %>%
   group_by(site, species_code, species_name, common_name, family, functional_group) %>%
   summarize(n.t = n(),
             bm = mean(bm.spp.t),
             se = sd(bm.spp.t)/sqrt(n.t))
 
+# species biomass across sites
 fish.bm.spp <- fish.bm.spp.site %>%
   group_by(species_code, species_name, common_name, family, functional_group) %>%
   summarize(bm.tot = mean(bm),
             se = sd(bm)/sqrt(n()))
 
-ggplot(fish.bm.spp,
-       aes(x = reorder(species_name, bm.tot), y = bm.tot)) +
-  geom_col(color = "black", fill = "cadetblue2", alpha = 0.8, stat = "identity", position = position_dodge()) +
-  geom_errorbar(aes(ymin = bm.tot - se, ymax = bm.tot + se), width = .2,
-                 position = position_dodge(.9)) +
-  coord_flip() +
-  labs(y = "Biomass (g/m2)", x = "") + 
-  theme_bw() +
-  theme(axis.text.y = element_text(face = "italic"),
-        legend.position = "right",
-        legend.title = element_blank())
-```
-
-
-```{r, eval = F}
-
-
-fish.bm.fam.site <- fish.bm.spp.t %>%
-  group_by(site, family, transect) %>%
-  summarize(bm.fam.t = sum(bm.spp.t)) %>%
-  ungroup() %>%
-  group_by(site, family) %>%
-  summarize(n.t = n(),
-            bm = mean(bm.fam.t),
-            se = sd(bm.fam.t)/sqrt(n.t))
-
-fish.bm.func.site <- fish.bm.spp.t %>%
+# functional group biomass by site
+fish.bm.func.site <- fish.bm.spp.t %>% # extra code - currently don't use this
   group_by(site, functional_group, transect) %>%
   summarize(bm.func.t = sum(bm.spp.t)) %>%
   ungroup() %>%
@@ -517,37 +454,103 @@ fish.bm.func.site <- fish.bm.spp.t %>%
             bm = mean(bm.func.t),
             se = sd(bm.func.t)/sqrt(n.t))
 
-ggplot(fish.bm.func.site, aes(x = functional_group, y = bm, group = functional_group, fill = functional_group)) +
-  geom_col() +
-  facet_grid(. ~ site) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90))
+# family biomass by site
+fish.bm.fam.site <- fish.bm.spp.t %>%
+  group_by(site, family, transect) %>%
+  summarize(bm.fam.t = sum(bm.spp.t)) %>%
+  ungroup() %>%
+  group_by(site, family) %>%
+  summarize(n.t = n(),
+            bm = mean(bm.fam.t),
+            se = sd(bm.fam.t)/sqrt(n.t))
+```
 
-ggplot(fish.bm.spp.site, aes(x = species_name, y = bm, group = family, fill = family)) +
-  geom_col() +
-  coord_flip() +
-  facet_grid(. ~ site) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90))
-  
+
+### Total biomass by site
+
+Notes:
+
+  - Regional averages are taken from Karr et al. 2015
+
+```{r}
+ggplot(fish.bm %>%
+         mutate(site = factor(site, levels = c("Rickett's Bay", "Ten Pound Bay", "The Barge", "York Bank", "York Island", "Friars Head Bay"))), 
+       aes(x = site, y = bm)) +
+  geom_col(color = "black", fill = "slategray4", alpha = 0.8, stat = "identity", position = position_dodge()) +
+  geom_errorbar(aes(ymin = bm - se, ymax = bm + se), width = .2,
+                 position = position_dodge(.9)) +
+  geom_hline(yintercept = 1300, linetype = "dashed", color = "black") +
+  annotate("text", x = 6.5, y = 1350, size = 3, hjust = 1, label=c('Caribbean mean unfished biomass')) +
+  labs(x = "", y = expression(Total~fish~biomass~(kg~ha^-1))) +
+  theme_bw()
+```
+
+### Parrotfish biomass by site
+
+Notes:
+
+  - Eastern Caribbean average parrotfish biomass for NTRs from Steneck et al. 2018 was ~ 1550 g/100m2, or 155 kg/ha. Note that this is potentially misleading because I'm sure a lot of these NTRs do experience some fishing. But mean fished parrotfish biomasses for the same region was ~ 750 g/100m2
+  - In Bonaire, mean parrotfish biomass
+```{r}
+ggplot(fish.bm.fam.site %>%
+        filter(family == "Scaridae") %>%
+         mutate(site = factor(site, levels = c("Rickett's Bay", "Ten Pound Bay", "The Barge", "York Bank", "York Island", "Friars Head Bay"))),
+       aes(x = site, y = bm)) +
+  geom_col(color = "black", fill = "slategray4", alpha = 0.8, stat = "identity", position = position_dodge()) +
+  geom_errorbar(aes(ymin = bm - se, ymax = bm + se), width = .2,
+                 position = position_dodge(.9)) +
+  geom_hline(yintercept = 155, linetype = "dashed", color = "black") +
+  annotate("text", x = 6.5, y = 160, size = 3, hjust = 1, label=c('Eastern Caribbean mean unfished biomass')) +
+  labs(x = "", y = expression(Parrotfish~biomass~(kg~ha^-1))) +
+  theme_bw()
 ```
 
 ### Length distribution of terminal phase scarids
 
 Notes:
 
-  - Need to decide what my reference points are here - mean terminal phase sizes in Bonaire, or other unfished populations? Will look through literature more...
-  - could also look at sex ratio as better indicator? (and compare with that Bermuda paper...
+  - Minimum sizes at maturity from O'Farrell et al. 2015:
+      - Sp. viride, 18 cm (Winn and Bardach 1960);
+      - Sp. aurofrenatum, 15 cm (Garcı´a-Cagide et al. 1994); 
+      - Sc. vetula, 19 cm (Winn and Bardach 1960); 
+      - and Sc. taeniopterus, 19 cm (Munro 1983).
   
-```{r, eval = F}
+```{r}
 scarids <- fish %>%
-  filter(species_code %in% c("stop", "rbp", "strp") & phase_code %in% c("i", "t")) 
+  filter(species_code %in% c("stop", "rbp", "qup", "strp") & !is.na(phase)) %>%
+  mutate(sex = case_when(phase %in% c("Juvenile", "Initial") ~ "Female",
+                         phase == "Terminal" ~ "Male"))
 
-ggplot(scarids, aes(x = length, group = phase, fill = phase)) +
-  geom_density(alpha = 0.5) +
-  labs(x = "Scarid length (cm)", y = "Density") +
-  facet_grid(. ~ species_name) +
-  theme_bw()
+ggplot(scarids, aes(x = length, fill = sex)) +
+  geom_histogram(stat = "count", alpha = 0.8, position = 'identity') +
+  facet_wrap(vars(species_name), ncol = 4) +
+  geom_vline(data = filter(scarids, species_code == "stop"), aes(xintercept = 18, color = "Minimum length at maturity"), linetype = "dashed") +
+  geom_vline(data = filter(scarids, species_code == "qup"), aes(xintercept = 19, color = "Minimum length at maturity"), linetype = "dashed") +
+  geom_vline(data = filter(scarids, species_code == "rbp"), aes(xintercept = 15, color = "Minimum length at maturity"), linetype = "dashed") +
+  geom_vline(data = filter(scarids, species_code == "strp"), aes(xintercept = 19, color = "Minimum length at maturity"), linetype = "dashed") +
+  scale_color_manual(values = c("black")) +
+  scale_fill_manual(values=c("pink2", "turquoise3")) +
+  theme_bw() +
+  labs(x = "Fish length (cm)", y = "Number observed", fill="") +
+  theme(strip.text = element_text(face = "italic"),
+        legend.title = element_blank(),
+        legend.position = "top")
+```
+
+### Species biomass across sites
+
+```{r, fig.height = 8, fig.width = 8}
+ggplot(fish.bm.spp,
+       aes(x = reorder(species_name, bm.tot), y = bm.tot)) +
+  geom_col(color = "black", fill = "cadetblue2", alpha = 0.8, stat = "identity", position = position_dodge()) +
+  geom_errorbar(aes(ymin = bm.tot - se, ymax = bm.tot + se), width = .2,
+                 position = position_dodge(.9)) +
+  coord_flip() +
+  labs(y = expression(Biomass~(kg~ha^-1)), x = "") + 
+  theme_bw() +
+  theme(axis.text.y = element_text(face = "italic"),
+        legend.position = "right",
+        legend.title = element_blank())
 ```
 
 ## Diadema 
@@ -556,14 +559,17 @@ Notes:
 
   - Estimated pre-mortality estimates for Antigua are obtained from Jackson et al. 2014, Bauer 1980 ~ 5 indv./m$^2$
 ```{r}
-diadema <- macroinverts %>%
+diadema <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "macroinvertebrates") %>% clean_names() %>%
+  filter(!is.na(site)) %>%
+  select(-c(date, surveyor)) %>%
   mutate(count = (diadema_adults + diadema_juvenile)/10) %>% # converting to #/m2 (from #/10m2)
   select(site, transect, count) %>%
   group_by(site) %>%
   summarize(density = mean(count),
             se = sd(count)/sqrt(n()))
 
-ggplot(diadema, aes(x = site, y = density)) +
+ggplot(diadema %>%
+         mutate(site = factor(site, levels = c("Rickett's Bay", "Ten Pound Bay", "The Barge", "York Bank", "York Island", "Friars Head Bay"))), aes(x = site, y = density)) +
   geom_col(stat = "identity", color = "black", fill = "gray20", alpha = 0.8,
            position = position_dodge()) +
   geom_errorbar(aes(ymin = density - se, ymax = density + se), width = .2,
@@ -572,7 +578,7 @@ ggplot(diadema, aes(x = site, y = density)) +
   annotate("text", x = 6.5, y = 5.2, size = 3, hjust = 1, label=c('Estimated pre-mortality densities in Antigua')) +
   #geom_text(aes(0, 5, label = "test", vjust = -1), size = 3) +
   theme_bw() +
-  labs(y = "Diadema density (indv. m-2)", x = "") +
+  labs(y = expression(Diadema~density~(indv.~m^-2)), x = "") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
@@ -583,6 +589,9 @@ Notes:
    - From Alvarez-Filip et al. 2009: Lesser Antilles average was 2.1 in the 1970s, 1.5 in 2000s
    
 ```{r}
+rugosity <- read_excel(here("data", "mrc_fish.xlsx"), sheet = "mrc.rugosity") %>% clean_names() %>%
+   select(-c(date, time, depth_m, surveyor))
+
 rugosity <- rugosity %>%
   group_by(site, transect) %>%
   summarize(rugosity.t = mean(rugosity/100)) %>%
@@ -596,7 +605,7 @@ ggplot(rugosity, aes(x = site, y = rugosity)) +
   geom_errorbar(aes(ymin = rugosity - se, ymax = rugosity + se), width = .2,
                  position = position_dodge(.9)) +
   geom_hline(yintercept = 2.1, linetype = "dashed", color = "black") +
-  annotate("text", x = 6.5, y = 2.2, size = 3, hjust = 1, label=c('Lesser Antilles mean from 1970s')) +
+  annotate("text", x = 6.5, y = 2.2, size = 3, hjust = 1, label=c('Eastern Caribbean mean from 1970s')) +
   theme_bw() +
   labs(y = "Rugosity ratio", x = "") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
