@@ -186,7 +186,7 @@ Notes:
 class.palette <- c("coral2", "pink", "darkolivegreen", "darkkhaki", "slategray3")
 
 ggplot(benthic.pc.class %>%
-         mutate(site = factor(site, levels = c("Rickett s Bay", "Ten Pound Bay", "The Barge", "York Bank", "York Island", "Friars Head Bay"))), 
+         mutate(site = factor(site, levels = c("Rickett s Bay", "Ten Pound Bay", "York Bank", "The Barge", "York Island", "Friars Head Bay"))), 
        aes(x = "benthic_class", y = pc, fill = benthic_class)) + 
   geom_bar(width = 1, stat = "identity", color = "black") +
   coord_polar("y", start=0) +
@@ -197,6 +197,7 @@ ggplot(benthic.pc.class %>%
   theme(legend.position = "bottom",
         legend.title = element_blank(),
         panel.spacing = unit(1, "lines"))
+ggsave(here("img", "benthic_pie.png"))
 ```
 
 
@@ -235,6 +236,7 @@ ggplot(corals, aes(x = reorder(species, pc.tot), y = pc.tot)) +
   labs(x = "", y = "Mean percent cover") +
   theme_bw() +
   theme(axis.text.y = element_text(face = "italic"))
+ggsave(here("img", "coral_spp.png"))
 ```
 
 
@@ -327,7 +329,7 @@ test.site <- algae.pc.type %>%
 algal.palette <- c("darkseagreen", "darkolivegreen", "darkkhaki")
 ggplot(algae.pc.type %>%
          filter(!is.na(algal_type)) %>%
-         mutate(site = factor(site, levels = c("Rickett s Bay", "Ten Pound Bay", "The Barge", "York Bank", "York Island", "Friars Head Bay"))), 
+         mutate(site = factor(site, levels = c("Rickett s Bay", "Ten Pound Bay", "York Bank", "The Barge", "York Island", "Friars Head Bay"))), 
        aes(x = algal_type, y = pc, fill = algal_type)) +
   geom_col(stat = "identity", color = "black", alpha = 0.8,
            position = position_dodge()) +
@@ -340,15 +342,17 @@ ggplot(algae.pc.type %>%
   theme(axis.text.x = element_blank(),
         legend.position = "bottom", 
         legend.title = element_blank())
+ggsave(here("img", "algae.png"))
 ```
 
+
+```{r, eval = F}
 ###  Sedimentation
 
-Notes: 
+# Notes: 
+# 
+#   - These are calculated as the percent of all turf points that are TA/TAS/STA, and do not reflect the percent cover of all turf algal types within a site
 
-  - These are calculated as the percent of all turf points that are TA/TAS/STA, and do not reflect the percent cover of all turf algal types within a site
-
-```{r}
 sediment.m <- benthic %>%
   filter(category_code == "TA") %>%
   expand(nesting(site, transect, meter), type_code) %>%
@@ -473,8 +477,8 @@ Notes:
   - Regional averages are taken from Karr et al. 2015
 
 ```{r}
-ggplot(fish.bm %>%
-         mutate(site = factor(site, levels = c("Rickett's Bay", "Ten Pound Bay", "The Barge", "York Bank", "York Island", "Friars Head Bay"))), 
+ggplot(fish.bm.site %>%
+         mutate(site = factor(site, levels = c("Rickett's Bay", "Ten Pound Bay", "York Bank", "The Barge", "York Island", "Friars Head Bay"))), 
        aes(x = site, y = bm)) +
   geom_col(color = "black", fill = "slategray4", alpha = 0.8, stat = "identity", position = position_dodge()) +
   geom_errorbar(aes(ymin = bm - se, ymax = bm + se), width = .2,
@@ -483,6 +487,7 @@ ggplot(fish.bm %>%
   annotate("text", x = 6.5, y = 1350, size = 3, hjust = 1, label=c('Caribbean mean unfished biomass')) +
   labs(x = "", y = expression(Total~fish~biomass~(kg~ha^-1))) +
   theme_bw()
+ggsave(here("img", "fish_bm.png"))
 ```
 
 ### Parrotfish biomass by site
@@ -494,15 +499,16 @@ Notes:
 ```{r}
 ggplot(fish.bm.fam.site %>%
         filter(family == "Scaridae") %>%
-         mutate(site = factor(site, levels = c("Rickett's Bay", "Ten Pound Bay", "The Barge", "York Bank", "York Island", "Friars Head Bay"))),
+         mutate(site = factor(site, levels = c("Rickett's Bay", "Ten Pound Bay", "York Bank", "The Barge", "York Island", "Friars Head Bay"))),
        aes(x = site, y = bm)) +
   geom_col(color = "black", fill = "slategray4", alpha = 0.8, stat = "identity", position = position_dodge()) +
   geom_errorbar(aes(ymin = bm - se, ymax = bm + se), width = .2,
                  position = position_dodge(.9)) +
   geom_hline(yintercept = 155, linetype = "dashed", color = "black") +
-  annotate("text", x = 6.5, y = 160, size = 3, hjust = 1, label=c('Eastern Caribbean mean unfished biomass')) +
+  annotate("text", x = 5.9, y = 165, size = 3, hjust = 1, label=c('Eastern Caribbean mean unfished biomass')) +
   labs(x = "", y = expression(Parrotfish~biomass~(kg~ha^-1))) +
   theme_bw()
+ggsave(here("img", "scarid_bm.png"))
 ```
 
 ### Length distribution of terminal phase scarids
@@ -535,11 +541,12 @@ ggplot(scarids, aes(x = length, fill = sex)) +
   theme(strip.text = element_text(face = "italic"),
         legend.title = element_blank(),
         legend.position = "top")
+ggsave(here("img", "scarid_length.png"))
 ```
 
 ### Species biomass across sites
 
-```{r, fig.height = 8, fig.width = 8}
+```{r, fig.height = 4, fig.width = 3}
 ggplot(fish.bm.spp,
        aes(x = reorder(species_name, bm.tot), y = bm.tot)) +
   geom_col(color = "black", fill = "cadetblue2", alpha = 0.8, stat = "identity", position = position_dodge()) +
@@ -551,6 +558,7 @@ ggplot(fish.bm.spp,
   theme(axis.text.y = element_text(face = "italic"),
         legend.position = "right",
         legend.title = element_blank())
+ggsave(here("img", "fish_spp.png"))
 ```
 
 ## Diadema 
@@ -569,7 +577,7 @@ diadema <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "macroinverte
             se = sd(count)/sqrt(n()))
 
 ggplot(diadema %>%
-         mutate(site = factor(site, levels = c("Rickett's Bay", "Ten Pound Bay", "The Barge", "York Bank", "York Island", "Friars Head Bay"))), aes(x = site, y = density)) +
+         mutate(site = factor(site, levels = c("Rickett's Bay", "Ten Pound Bay", "York Bank", "The Barge", "York Island", "Friars Head Bay"))), aes(x = site, y = density)) +
   geom_col(stat = "identity", color = "black", fill = "gray20", alpha = 0.8,
            position = position_dodge()) +
   geom_errorbar(aes(ymin = density - se, ymax = density + se), width = .2,
@@ -580,6 +588,7 @@ ggplot(diadema %>%
   theme_bw() +
   labs(y = expression(Diadema~density~(indv.~m^-2)), x = "") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave(here("img", "diadema.png"))
 ```
 
 ## Rugosity
@@ -609,5 +618,6 @@ ggplot(rugosity, aes(x = site, y = rugosity)) +
   theme_bw() +
   labs(y = "Rugosity ratio", x = "") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave(here("img", "rugosity.png"))
 ```
 
