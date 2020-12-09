@@ -44,8 +44,8 @@ benthic <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "benthic") %>
          benthic_class = case_when(category_code %in% c("LC", "SLC") ~ "Hard corals",
                                   category_code %in% c("MA") ~ "Macroalgae",
                                   category_code %in% c("TA") ~ "Turf algae",
-                                  category_code %in% c("CCA", "CCA_ND", "PEY") ~ "CCA",
-                                  category_code %in% c("OINV", "SPON", "AINV", "CYAN") ~ "Other competitors",
+                                  category_code %in% c("CCA", "CCA_ND") ~ "CCA",
+                                  category_code %in% c("OINV", "SPON", "AINV", "CYAN", "PEY") ~ "Other competitors",
                                   category_code %in% c("SAND", "HOLE", "SG", "PAVE") ~ "Other substratum"
                                     ),
          algal_type = case_when(type_code %in% c("BFMA", "GFMA", "RFMA") ~ "Fleshy macroalgae",
@@ -53,7 +53,7 @@ benthic <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "benthic") %>
                                 type_code %in% c("TA", "TAS", "STA") ~ "Turf algae"),
          av_sub_yn = if_else(category_code %in% c("SAND", "HOLE", "SG", "PAVE"), "no", "yes")
          )  %>%
-  filter(!(site == "Rickett's Bay" & ((transect == 1 & meter == 9) | (transect == 2 & meter == 9)))) # both of these meters were only sand and/or seagrass, and were causing issues later in the analysis
+  filter(!(site %in% c("Rickett's Bay", "Rickett s Bay") & ((transect == 1 & meter == 9) | (transect == 2 & meter == 9)))) # both of these meters were only sand and/or seagrass, and were causing issues later in the analysis
 
 # "expand" a dataframe so that it contains all benthic classes per site/transect/meter, and then join the full dataset so that any meters where a species was absent it will show up as 0 (as opposed to just not having an entry at all)
 benthic.pc.class.m <- benthic %>%
@@ -178,7 +178,7 @@ test.site <- benthic.pc.spp %>%
 Notes:
 
  - All scleractinian corals (LC, SLC) are grouped here as hard corals
- - All AINV, OINV, SPON, and CYAN are grouped as other competitors
+ - All AINV, OINV, SPON, CYAN, and PEY are grouped as other competitors
  - These values are percent cover of available substrate (i.e. does not include seagrass, sand, holes, and pavement - wasn't sure what to do with pavement or what that exactly is)
  - Rickett's Bay apostrophe comes out in actual graph file, not on this knit html for some reason
 
@@ -345,6 +345,10 @@ ggplot(algae.pc.type %>%
 ggsave(here("img", "algae.png"))
 ```
 
+```{r}
+kable(algae.pc.type)
+```
+
 
 ```{r, eval = F}
 ###  Sedimentation
@@ -490,6 +494,11 @@ ggplot(fish.bm.site %>%
 ggsave(here("img", "fish_bm.png"))
 ```
 
+```{r}
+kable(fish.bm.site)
+```
+
+
 ### Parrotfish biomass by site
 
 Notes:
@@ -509,6 +518,9 @@ ggplot(fish.bm.fam.site %>%
   labs(x = "", y = expression(Parrotfish~biomass~(kg~ha^-1))) +
   theme_bw()
 ggsave(here("img", "scarid_bm.png"))
+```
+```{r}
+kable(fish.bm.fam.site %>% filter(family == "Scaridae"))
 ```
 
 ### Length distribution of terminal phase scarids
