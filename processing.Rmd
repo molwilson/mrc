@@ -206,6 +206,49 @@ ggsave(here("img", "benthic_pie.png"))
 ```{r}
 kable(benthic.pc.class %>% select(site, benthic_class, pc, se))
 ```
+Pie chart for average MRC reef
+```{r}
+benthic.pc.class.mean <- benthic.pc.class %>%
+  group_by(benthic_class) %>%
+  summarize(pc.mean = mean(pc),
+            se = sd(pc)/sqrt(n())) %>%
+  mutate(benthic_class = factor(benthic_class, levels = c("Hard corals", "CCA", "Macroalgae", "Turf algae", "Other competitors")))
+
+ggplot(benthic.pc.class.mean, 
+       aes(x = "benthic_class", y = pc.mean, fill = benthic_class)) + 
+  geom_bar(width = 1, stat = "identity", color = "black") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = class.palette) +
+  #geom_text(aes(y = ypos, label = pc), color = "white", size=2) +
+  theme_void() +
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        panel.spacing = unit(1, "lines"))
+ggsave(here("img", "benthic_pie_mrc_mean.png"))
+```
+```{r}
+kable(benthic.pc.class.mean %>% select(site, benthic_class, pc, se))
+```
+
+Pie chart for "healthy" reef (adapted from Bonaire)
+```{r}
+benthic_class <- c("Hard corals", "CCA", "Macroalgae", "Turf algae", "Other competitors")
+pc <- c(40, 8, 10, 30, 12)
+healthy <- as.data.frame(benthic_class, pc) %>%
+  mutate(benthic_class = factor(benthic_class, levels = c("Hard corals", "CCA", "Macroalgae", "Turf algae", "Other competitors")))
+
+ggplot(healthy, 
+       aes(x = "benthic_class", y = pc, fill = benthic_class)) + 
+  geom_bar(width = 1, stat = "identity", color = "black") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = class.palette) +
+  #geom_text(aes(y = ypos, label = pc), color = "white", size=2) +
+  theme_void() +
+  theme(legend.position = "bottom",
+        legend.title = element_blank(),
+        panel.spacing = unit(1, "lines"))
+ggsave(here("img", "benthic_pie_healthy.png"))
+```
 
 
 ### Hard corals
