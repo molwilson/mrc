@@ -35,7 +35,7 @@ Notes on adjustments to OG benthic dataset:
 ```{r}
 # import and processing
 
-benthic <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "benthic") %>% clean_names() %>%
+benthic <- read_excel(here("data", "mrc_benthic.xlsx"), sheet = "benthic") %>% clean_names() %>%
   filter(!is.na(site)) %>%
   select(-c(date, surveyor, notes)) %>%
   separate(species_code, c("species_code", "indicator")) %>% # separating variables with an underscore into two columns
