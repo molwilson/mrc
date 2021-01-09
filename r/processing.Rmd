@@ -449,7 +449,7 @@ ggplot(sediment, aes(x = sedimentation, y = pc)) +
 ```{r}
 # import and processing
 
-fish <- read_excel(here("data", "MRC_fish.xlsx"), sheet = "mrc.fish") %>% clean_names() %>%
+fish <- read_excel(here("data", "mrc_fish.xlsx"), sheet = "mrc.fish") %>% clean_names() %>%
   select(-c(date, time, depth_m, surveyor)) %>% # not using these variables currently, so nice to streamline
   filter(!is.na(site)) %>% # remove any incomplete rows at the end of the data
   uncount(number) %>% # expand to replicate rows if multiple fish were recorded
