@@ -226,9 +226,7 @@ ggplot(benthic.pc.class.mean,
         panel.spacing = unit(1, "lines"))
 ggsave(here("img", "benthic_pie_mrc_mean.png"))
 ```
-```{r}
-kable(benthic.pc.class.mean %>% select(site, benthic_class, pc, se))
-```
+
 
 Pie chart for "healthy" reef (adapted from Bonaire)
 ```{r}
@@ -449,7 +447,7 @@ ggplot(sediment, aes(x = sedimentation, y = pc)) +
 ```{r}
 # import and processing
 
-fish <- read_excel(here("data", "mrc_fish.xlsx"), sheet = "mrc.fish") %>% clean_names() %>%
+fish <- read_excel(here("data", "mrc_fish.xlsx"), sheet = "fish") %>% clean_names() %>%
   select(-c(date, time, depth_m, surveyor)) %>% # not using these variables currently, so nice to streamline
   filter(!is.na(site)) %>% # remove any incomplete rows at the end of the data
   uncount(number) %>% # expand to replicate rows if multiple fish were recorded
@@ -622,7 +620,7 @@ Notes:
 
   - Estimated pre-mortality estimates for Antigua are obtained from Jackson et al. 2014, Bauer 1980 ~ 5 indv./m$^2$
 ```{r}
-diadema <- read_excel(here("data", "MRC_benthic_V5.xlsx"), sheet = "macroinvertebrates") %>% clean_names() %>%
+diadema <- read_excel(here("data", "mrc_benthic.xlsx"), sheet = "macroinvertebrates") %>% clean_names() %>%
   filter(!is.na(site)) %>%
   select(-c(date, surveyor)) %>%
   mutate(count = (diadema_adults + diadema_juvenile)/10) %>% # converting to #/m2 (from #/10m2)
@@ -653,7 +651,7 @@ Notes:
    - From Alvarez-Filip et al. 2009: Lesser Antilles average was 2.1 in the 1970s, 1.5 in 2000s
    
 ```{r}
-rugosity <- read_excel(here("data", "mrc_fish.xlsx"), sheet = "mrc.rugosity") %>% clean_names() %>%
+rugosity <- read_excel(here("data", "mrc_fish.xlsx"), sheet = "rugosity") %>% clean_names() %>%
    select(-c(date, time, depth_m, surveyor))
 
 rugosity <- rugosity %>%
